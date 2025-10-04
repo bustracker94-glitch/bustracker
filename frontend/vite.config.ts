@@ -1,10 +1,27 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
     react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['bus.png'],
+      manifest: {
+        name: 'Bus Tracker',
+        short_name: 'BusTracker',
+        description: 'Smart Bus Tracking System',
+        theme_color: '#ffffff',
+        icons: [
+          {
+            src: 'bus.png',
+            sizes: '192x192',
+            type: 'image/png'
+          }
+        ]
+      }
+    }),
     {
       name: 'startup-logger',
       configureServer(server) {

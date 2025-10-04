@@ -1,10 +1,51 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bus, Search, MapPin, Menu } from 'lucide-react';
+import { Bus, Search, MapPin, Menu, Download } from 'lucide-react';
 
 export default function Navbar() {
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+
+  useEffect(() => {
+    const handleInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+
+    const handleAppInstalled = () => {
+      setIsAppInstalled(true);
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    // Check if the app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsAppInstalled(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        } else {
+          console.log('User dismissed the install prompt');
+        }
+        setInstallPrompt(null);
+      });
+    }
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -48,10 +89,27 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            {installPrompt && !isAppInstalled && (
+              <button
+                onClick={handleInstallClick}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                <span>Install App</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
+            {installPrompt && !isAppInstalled && (
+              <button
+                onClick={handleInstallClick}
+                className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              >
+                <Download className="h-6 w-6" />
+              </button>
+            )}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50"
