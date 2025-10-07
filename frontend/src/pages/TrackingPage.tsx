@@ -163,21 +163,7 @@ export default function TrackingPage() {
         </div>
       </div>
 
-      {/* Route Toggle */}
-      <div className="mb-4">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setRouteType('morning')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${state.routeType === 'morning' ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            Morning
-          </button>
-          <button
-            onClick={() => setRouteType('evening')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${state.routeType === 'evening' ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            Evening
-          </button>
-        </div>
-      </div>
+      
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[calc(100vh-12rem)]">
