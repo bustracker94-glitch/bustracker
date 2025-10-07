@@ -1,6 +1,3 @@
-
-
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -35,15 +32,16 @@ app.use(express.json());
 
 // In-memory storage for bus locations
 const busLocations = new Map();
-const busRoutes = new Map();
+const busRoutes = new Map(); // This will store route variants for each bus
+
 
 // Helper function to get local IP
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
-    for (const interface of interfaces[name]) {
-      if (interface.family === 'IPv4' && !interface.internal) {
-        return interface.address;
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
       }
     }
   }
@@ -62,40 +60,62 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-
-
 // Initialize bus routes and locations
 busRoutesData.forEach(route => {
-  busRoutes.set(route.busId, route);
-  busLocations.set(route.busId, {
-    busId: route.busId,
-    lat: route.stops[0].lat,
-    lon: route.stops[0].lon,
-    speed: 0,
-    updated: new Date().toISOString(),
-    status: 'Stopped',
-    currentStopIndex: 0
-  });
+  const baseBusId = route.busId.split('_')[0];
+  if (!busRoutes.has(baseBusId)) {
+    busRoutes.set(baseBusId, {});
+    busLocations.set(baseBusId, {
+      busId: baseBusId,
+      lat: route.stops[0].lat,
+      lon: route.stops[0].lon,
+      speed: 0,
+      updated: new Date().toISOString(),
+      status: 'Stopped',
+      currentStopIndex: 0,
+      routeType: 'morning' // Default to morning
+    });
+  }
+
+  const routeType = route.busId.includes('_EVE') ? 'evening' : 'morning';
+  busRoutes.get(baseBusId)[routeType] = route;
 });
 
 // Routes
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Smart Bus Tracker Backend is running',
     timestamp: new Date().toISOString()
   });
 });
 
 // Helper function to get detailed bus information
-function getBusDetails(busId) {
+function getBusDetails(busId, routeType) {
   const location = busLocations.get(busId);
-  const route = busRoutes.get(busId);
+  const routeVariants = busRoutes.get(busId);
 
-  if (!location || !route) {
+  if (!location || !routeVariants) {
     return null;
+  }
+
+  // If routeType is not provided, determine it by time
+  if (!routeType) {
+    const hour = new Date().getHours();
+    routeType = hour < 12 ? 'morning' : 'evening';
+  }
+
+  let route = routeVariants[routeType];
+  if (!route) {
+    // Fallback to the other route if the selected one doesn't exist
+    const fallbackRouteType = routeType === 'morning' ? 'evening' : 'morning';
+    route = routeVariants[fallbackRouteType];
+    if (!route) {
+      return null;
+    }
+    routeType = fallbackRouteType;
   }
 
   const currentStop = route.stops[location.currentStopIndex];
@@ -120,7 +140,8 @@ function getBusDetails(busId) {
     nextStop: nextStop?.name,
     eta: eta,
     totalStops: route.stops.length,
-    stops: route.stops
+    stops: route.stops,
+    routeType: routeType
   };
 }
 
@@ -141,7 +162,8 @@ app.get('/api/buses', (req, res) => {
 // Get specific bus location
 app.get('/api/locations/:busId', (req, res) => {
   const { busId } = req.params;
-  const busDetails = getBusDetails(busId.toUpperCase());
+  const { routeType } = req.query; // morning or evening
+  const busDetails = getBusDetails(busId.toUpperCase(), routeType);
   
   if (!busDetails) {
     return res.status(404).json({ error: 'Bus not found' });
@@ -159,26 +181,36 @@ app.post('/api/locations', (req, res) => {
   }
 
   const busId = device_id.toUpperCase();
-  const route = busRoutes.get(busId);
+  const routeVariants = busRoutes.get(busId);
+  if (!routeVariants) {
+    return res.status(404).json({ error: 'Bus not found' });
+  }
+
+  // Determine route by time of day
+  const hour = new Date().getHours();
+  const routeType = hour < 12 ? 'morning' : 'evening';
+  const route = routeVariants[routeType];
+
+  if (!route) {
+    return res.status(404).json({ error: `Route type '${routeType}' not found for bus ${busId}` });
+  }
   
   let currentStopIndex = 0;
   let status = speed > 0 ? 'Moving' : 'Stopped';
   
   // Find current stop based on proximity
-  if (route) {
-    let minDistance = Infinity;
-    route.stops.forEach((stop, index) => {
-      const distance = calculateDistance(lat, lon, stop.lat, stop.lon);
-      if (distance < minDistance) {
-        minDistance = distance;
-        currentStopIndex = index;
-      }
-    });
-    
-    // If very close to a stop (within 100m), mark as at stop
-    if (minDistance < 0.1) {
-      status = 'At Stop';
+  let minDistance = Infinity;
+  route.stops.forEach((stop, index) => {
+    const distance = calculateDistance(lat, lon, stop.lat, stop.lon);
+    if (distance < minDistance) {
+      minDistance = distance;
+      currentStopIndex = index;
     }
+  });
+  
+  // If very close to a stop (within 100m), mark as at stop
+  if (minDistance < 0.1) {
+    status = 'At Stop';
   }
 
   const locationData = {
@@ -188,15 +220,16 @@ app.post('/api/locations', (req, res) => {
     speed: speed ? parseFloat(speed) : 0,
     updated: new Date().toISOString(),
     status,
-    currentStopIndex
+    currentStopIndex,
+    routeType
   };
 
   busLocations.set(busId, locationData);
   
-  console.log(`📍 Updated location for ${busId}: ${lat}, ${lon} (Speed: ${speed} km/h)`);
+  console.log(`📍 Updated location for ${busId}: ${lat}, ${lon} (Speed: ${speed} km/h) on ${routeType} route`);
   
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'Location updated successfully',
     data: locationData
   });
@@ -205,19 +238,23 @@ app.post('/api/locations', (req, res) => {
 // Get bus route information
 app.get('/api/routes/:busId', (req, res) => {
   const { busId } = req.params;
-  const route = busRoutes.get(busId.toUpperCase());
+  const { routeType = 'morning' } = req.query; // Default to morning
+  const routeVariants = busRoutes.get(busId.toUpperCase());
   
-  if (!route) {
+  if (!routeVariants || !routeVariants[routeType]) {
     return res.status(404).json({ error: 'Route not found' });
   }
   
-  res.json(route);
+  res.json(routeVariants[routeType]);
 });
 
-// Get all routes
+// Get all routes (less meaningful now, but kept for compatibility)
 app.get('/api/routes', (req, res) => {
-  const routes = Array.from(busRoutes.values());
-  res.json(routes);
+  const allRoutes = [];
+  for (const routeVariants of busRoutes.values()) {
+    allRoutes.push(...Object.values(routeVariants));
+  }
+  res.json(allRoutes);
 });
 
 // 404 handler
