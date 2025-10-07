@@ -1,9 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bus, Search, MapPin, Menu, Download } from 'lucide-react';
-
+import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
 export default function Navbar() {
+  const translations = {
+    en: {
+      search: 'Search',
+      buses: 'Buses',
+      smartBusTracker: 'Smart Bus Tracker',
+      realTimeGps: 'Real-time GPS tracking',
+      installApp: 'Install App',
+    },
+    ta: {
+      search: 'தேடு',
+      buses: 'பஸ்கள்',
+      smartBusTracker: 'ஸ்மார்ட் பஸ் டிராக்கர்',
+      realTimeGps: 'நேரடி GPS கண்காணிப்பு',
+      installApp: 'அப்பை நிறுவவும்',
+    },
+  };
   const location = useLocation();
+  const { language } = useLanguage();
+  const langKey = language === 'Tamil' ? 'ta' : 'en';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
@@ -50,8 +69,8 @@ export default function Navbar() {
   const isActive = (path: string) => location.pathname === path;
 
   const navItems = [
-    { path: '/', label: 'Search', icon: Search },
-    { path: '/buses', label: 'Buses', icon: Bus },
+    { path: '/', label: translations[langKey].search, icon: Search },
+    { path: '/buses', label: translations[langKey].buses, icon: Bus },
   ];
 
   return (
@@ -64,8 +83,8 @@ export default function Navbar() {
                 <Bus className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Smart Bus Tracker</h1>
-                <p className="text-xs text-gray-500">Real-time GPS tracking</p>
+                <h1 className="text-xl font-bold text-gray-900">{translations[langKey].smartBusTracker}</h1>
+                <p className="text-xs text-gray-500">{translations[langKey].realTimeGps}</p>
               </div>
             </Link>
           </div>
@@ -89,13 +108,14 @@ export default function Navbar() {
                 </Link>
               );
             })}
+                        <LanguageSwitcher />
             {installPrompt && !isAppInstalled && (
               <button
                 onClick={handleInstallClick}
                 className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               >
                 <Download className="h-4 w-4" />
-                <span>Install App</span>
+                <span>{translations[langKey].installApp}</span>
               </button>
             )}
           </div>
@@ -106,6 +126,7 @@ export default function Navbar() {
               <button
                 onClick={handleInstallClick}
                 className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                title={translations[langKey].installApp}
               >
                 <Download className="h-6 w-6" />
               </button>
@@ -113,6 +134,7 @@ export default function Navbar() {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              title="Menu"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -122,6 +144,7 @@ export default function Navbar() {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 py-2">
+            <LanguageSwitcher />
             {navItems.map((item) => {
               const Icon = item.icon;
               return (

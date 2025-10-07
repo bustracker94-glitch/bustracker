@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, MapPin, Clock, History, ArrowRight } from "lucide-react";
+import { useLanguage } from '../context/LanguageContext';
 
 interface RecentSearch {
   from: string;
@@ -9,6 +10,60 @@ interface RecentSearch {
 }
 
 export default function SearchPage() {
+  const { language } = useLanguage();
+  // Shared mapping for all stop/route names
+  const tamilNameMap: Record<string, string> = {
+    'Boothapadi': 'பூதபாடி',
+    'Poonachi': 'பூனாச்சி',
+    'Chithar': 'சித்தார்',
+    'Bhavani BS': 'பவானி பஸ் நிலையம்',
+    'Kalingarayanpalayam': 'கலிங்கராயன்பாளையம்',
+    'Lakshminagar': 'லட்சுமிநகர்',
+    'R.N. Pudhur': 'ஆர்.என். புதூர்',
+    'Agraharam': 'அக்ரஹாரம்',
+    'Erode BS': 'ஈரோடு பஸ் நிலையம்',
+    'Savitha & G.H': 'சவிதா & அரசு மருத்துவமனை',
+    'Diesel Shed': 'டீசல் ஷெட்',
+    'Kasipalayam': 'காசிபாளையம்',
+    'ITI': 'ஐ.டி.ஐ',
+    'KK-nagar': 'கே.கே. நகர்',
+    'Rangapalayam': 'ரங்கபாளையம்',
+    'Mpnmjec': 'எம்.பி.என்.எம்.ஜெக்',
+    'Unjapalayam': 'உஞ்சபாளையம்',
+    'Attavanaipudur': 'அட்டவணைப்புதூர்',
+    // Add more as needed
+  };
+  const t = language === 'Tamil' ? {
+    findYourBus: 'உங்கள் பஸ்ஸை கண்டறியுங்கள்',
+    trackBuses: 'பஸ்களை நேரடியாக கண்காணிக்கவும், துல்லியமான வருகை நேரத்தைப் பெறவும், உங்கள் பயணத்தை தவறவிடாதீர்கள்',
+    from: 'இருந்து',
+    to: 'வரை',
+    enterDeparture: 'புறப்படும் இடத்தை உள்ளிடவும்',
+    enterDestination: 'சேரும் இடத்தை உள்ளிடவும்',
+    findAvailableBuses: 'கிடைக்கும் பஸ்களை கண்டறியுங்கள்',
+    recentSearches: 'சமீபத்திய தேடல்கள்',
+    noRecentSearches: 'இன்னும் சமீபத்திய தேடல்கள் இல்லை',
+    searchHistory: 'உங்கள் தேடல் வரலாறு இங்கே தோன்றும்',
+    activeRoutes: 'செயலில் உள்ள பாதைகள்',
+    busStops: 'பஸ் நிறுத்தங்கள்',
+    updateInterval: 'புதுப்பிப்பு இடைவெளி',
+    liveTracking: 'நேரடி கண்காணிப்பு',
+  } : {
+    findYourBus: 'Find Your Bus',
+    trackBuses: 'Track buses in real-time, get accurate ETAs, and never miss your ride again',
+    from: 'From',
+    to: 'To',
+    enterDeparture: 'Enter departure location',
+    enterDestination: 'Enter destination',
+    findAvailableBuses: 'Find Available Buses',
+    recentSearches: 'Recent Searches',
+    noRecentSearches: 'No recent searches yet',
+    searchHistory: 'Your search history will appear here',
+    activeRoutes: 'Active Routes',
+    busStops: 'Bus Stops',
+    updateInterval: 'Update Interval',
+    liveTracking: 'Live Tracking',
+  };
   const navigate = useNavigate();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -82,10 +137,9 @@ export default function SearchPage() {
             <Search className="h-10 w-10 text-white" />
           </div>
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Find Your Bus</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t.findYourBus}</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Track buses in real-time, get accurate ETAs, and never miss your ride
-          again
+          {t.trackBuses}
         </p>
       </div>
 
@@ -99,20 +153,20 @@ export default function SearchPage() {
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
                 <MapPin className="inline h-4 w-4 mr-1" />
-                From
+                {t.from}
               </label>
               <input
                 type="text"
                 id="from"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                placeholder="Enter departure location"
+                placeholder={t.enterDeparture}
                 className="input"
                 list="from-suggestions"
               />
               <datalist id="from-suggestions">
                 {popularStops.map((stop) => (
-                  <option key={stop} value={stop} />
+                  <option key={stop} value={language === 'Tamil' ? (tamilNameMap[stop] || stop) : stop} />
                 ))}
               </datalist>
             </div>
@@ -123,20 +177,20 @@ export default function SearchPage() {
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
                 <MapPin className="inline h-4 w-4 mr-1" />
-                To
+                {t.to}
               </label>
               <input
                 type="text"
                 id="to"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                placeholder="Enter destination"
+                placeholder={t.enterDestination}
                 className="input"
                 list="to-suggestions"
               />
               <datalist id="to-suggestions">
                 {popularStops.map((stop) => (
-                  <option key={stop} value={stop} />
+                  <option key={stop} value={language === 'Tamil' ? (tamilNameMap[stop] || stop) : stop} />
                 ))}
               </datalist>
             </div>
@@ -148,7 +202,7 @@ export default function SearchPage() {
             className="btn-primary w-full"
           >
             <Search className="h-5 w-5" />
-            Find Available Buses
+            {t.findAvailableBuses}
           </button>
         </div>
       </div>
@@ -158,7 +212,7 @@ export default function SearchPage() {
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <History className="h-5 w-5 mr-2 text-primary-500" />
-            Recent Searches
+            {t.recentSearches}
           </h3>
           {recentSearches.length > 0 ? (
             <div className="space-y-2">
@@ -171,11 +225,11 @@ export default function SearchPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium text-gray-700">
-                        {search.from}
+                        {language === 'Tamil' ? (tamilNameMap[search.from] || search.from) : search.from}
                       </span>
                       <ArrowRight className="h-4 w-4 text-gray-400" />
                       <span className="text-sm font-medium text-gray-700">
-                        {search.to}
+                        {language === 'Tamil' ? (tamilNameMap[search.to] || search.to) : search.to}
                       </span>
                     </div>
                     <Clock className="h-4 w-4 text-gray-400 group-hover:text-primary-500" />
@@ -189,8 +243,8 @@ export default function SearchPage() {
           ) : (
             <div className="text-center py-8 text-gray-500">
               <History className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No recent searches yet</p>
-              <p className="text-sm">Your search history will appear here</p>
+              <p>{t.noRecentSearches}</p>
+              <p className="text-sm">{t.searchHistory}</p>
             </div>
           )}
         </div>
@@ -200,19 +254,19 @@ export default function SearchPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
         <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-primary-600 mb-1">1</div>
-          <div className="text-sm text-gray-600">Active Routes</div>
+          <div className="text-sm text-gray-600">{t.activeRoutes}</div>
         </div>
         <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-primary-600 mb-1">15</div>
-          <div className="text-sm text-gray-600">Bus Stops</div>
+          <div className="text-sm text-gray-600">{t.busStops}</div>
         </div>
         <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-primary-600 mb-1">5s</div>
-          <div className="text-sm text-gray-600">Update Interval</div>
+          <div className="text-sm text-gray-600">{t.updateInterval}</div>
         </div>
         <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-primary-600 mb-1">24/7</div>
-          <div className="text-sm text-gray-600">Live Tracking</div>
+          <div className="text-sm text-gray-600">{t.liveTracking}</div>
         </div>
       </div>
     </div>

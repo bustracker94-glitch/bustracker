@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import busImage from './bus1.png';
+import { useLanguage } from '../context/LanguageContext';
 
 // Fix for default markers in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -66,6 +67,39 @@ const currentStopIcon = L.divIcon({
 const MapView: React.FC<MapViewProps> = ({ bus }) => {
   const mapRef = useRef<L.Map>(null);
   const center = [bus.lat, bus.lon] as [number, number];
+  const { language } = useLanguage();
+  const t = language === 'Tamil' ? {
+    speed: 'வேகம்',
+    kmh: 'கிமீ/மணி',
+    status: 'நிலை',
+    scheduled: 'திட்டமிடப்பட்டது',
+    currentLocation: '📍 தற்போதைய இடம்',
+    moving: 'நகர்கிறது',
+    stopped: 'நிறுத்தப்பட்டது',
+    atStop: 'நிறுத்தத்தில்',
+  } : {
+    speed: 'Speed',
+    kmh: 'km/h',
+    status: 'Status',
+    scheduled: 'Scheduled',
+    currentLocation: '📍 Current location',
+    moving: 'Moving',
+    stopped: 'Stopped',
+    atStop: 'At Stop',
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'moving':
+        return t.moving;
+      case 'stopped':
+        return t.stopped;
+      case 'at stop':
+        return t.atStop;
+      default:
+        return status;
+    }
+  };
 
   return (
     <div className="w-full h-[300px] sm:h-[400px] md:h-[450px] lg:h-full aspect-[4/3] rounded-xl overflow-hidden">
@@ -85,8 +119,8 @@ const MapView: React.FC<MapViewProps> = ({ bus }) => {
           <Popup>
             <div className="p-2">
               <h3 className="font-semibold text-gray-900">{bus.busId}</h3>
-              <p className="text-sm text-gray-600">Speed: {bus.speed} km/h</p>
-              <p className="text-sm text-gray-600">Status: {bus.status}</p>
+              <p className="text-sm text-gray-600">{t.speed}: {bus.speed} {t.kmh}</p>
+              <p className="text-sm text-gray-600">{t.status}: {getStatusLabel(bus.status)}</p>
             </div>
           </Popup>
         </Marker>
@@ -107,8 +141,8 @@ const MapView: React.FC<MapViewProps> = ({ bus }) => {
               <Popup>
                 <div className="p-1">
                   <h4 className="font-semibold">{stop.name}</h4>
-                  <p className="text-sm text-gray-600">Scheduled: {stop.time}</p>
-                  {isCurrent && <p className="text-sm font-bold text-yellow-600">📍 Current location</p>}
+                  <p className="text-sm text-gray-600">{t.scheduled}: {stop.time}</p>
+                  {isCurrent && <p className="text-sm font-bold text-yellow-600">{t.currentLocation}</p>}
                 </div>
               </Popup>
             </Marker>
