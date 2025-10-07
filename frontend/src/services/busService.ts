@@ -13,13 +13,17 @@ export const busService = {
     return response.data;
   },
 
-  async getBusLocation(busId: string) {
-    const response = await api.get(`/locations/${busId}`);
+  async getBusLocation(busId: string, routeType?: string) {
+    const response = await api.get(`/locations/${busId}`, {
+      params: { routeType },
+    });
     return response.data;
   },
 
-  async getBusRoute(busId: string) {
-    const response = await api.get(`/routes/${busId}`);
+  async getBusRoute(busId: string, routeType: string) {
+    const response = await api.get(`/routes/${busId}`, {
+      params: { routeType },
+    });
     return response.data;
   },
 

@@ -75,14 +75,14 @@ export default function TrackingPage() {
     speed: 'Speed',
   };
   const { busId } = useParams<{ busId: string }>();
-  const { state, fetchBusDetails } = useBus();
+  const { state, fetchBusDetails, setRouteType } = useBus();
   const bus = state.selectedBus;
 
   useEffect(() => {
     if (busId) {
-      fetchBusDetails(busId);
+      fetchBusDetails(busId, state.routeType);
     }
-  }, [busId]);
+  }, [busId, state.routeType]);
 
   const getStatusClass = (status: string) => {
     switch (status.toLowerCase()) {
@@ -160,6 +160,22 @@ export default function TrackingPage() {
           {state.loading && (
             <RefreshCw className="h-4 w-4 animate-spin text-primary-500" />
           )}
+        </div>
+      </div>
+
+      {/* Route Toggle */}
+      <div className="mb-4">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setRouteType('morning')}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${state.routeType === 'morning' ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+            Morning
+          </button>
+          <button
+            onClick={() => setRouteType('evening')}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${state.routeType === 'evening' ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+            Evening
+          </button>
         </div>
       </div>
 
