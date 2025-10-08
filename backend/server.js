@@ -174,7 +174,7 @@ app.get('/api/locations/:busId', (req, res) => {
 
 // Update bus location (from GPS hardware)
 app.post('/api/locations', (req, res) => {
-  const { device_id, lat, lon, speed } = req.body;
+  const { device_id, lat, lon, speed, time } = req.body;
   
   if (!device_id || lat === undefined || lon === undefined) {
     return res.status(400).json({ error: 'Missing required fields: device_id, lat, lon' });
@@ -213,12 +213,22 @@ app.post('/api/locations', (req, res) => {
     status = 'At Stop';
   }
 
+  // Use the time from the hardware, or fallback to server time
+  let updatedTimestamp;
+  if (time) {
+    // The hardware sends time as "HH:MM:SS". We combine it with the current date.
+    const today = new Date().toISOString().split('T')[0];
+    updatedTimestamp = new Date(`${today}T${time}Z`).toISOString();
+  } else {
+    updatedTimestamp = new Date().toISOString();
+  }
+
   const locationData = {
     busId,
     lat: parseFloat(lat),
     lon: parseFloat(lon),
     speed: speed ? parseFloat(speed) : 0,
-    updated: new Date().toISOString(),
+    updated: updatedTimestamp,
     status,
     currentStopIndex,
     routeType
@@ -226,7 +236,7 @@ app.post('/api/locations', (req, res) => {
 
   busLocations.set(busId, locationData);
   
-  console.log(`📍 Updated location for ${busId}: ${lat}, ${lon} (Speed: ${speed} km/h) on ${routeType} route`);
+  console.log(`📍 Updated location for ${busId}: ${lat}, ${lon} (Speed: ${speed} km/h) on ${routeType} route at ${time}`);
   
   res.json({
     success: true,
