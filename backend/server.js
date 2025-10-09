@@ -178,11 +178,23 @@ app.get('/api/locations/:busId', (req, res) => {
   res.json(busDetails);
 });
 
-// Update bus location (from GPS hardware)
-app.post('/api/locations/:busId', (req, res) => {
+
+// Update bus location (from GPS hardware) - accepts both /api/locations/:busId and /api/locations with device_id
+app.post('/api/locations/:busId', handleLocationUpdate);
+app.post('/api/locations', (req, res) => {
+  const { device_id, lat, lon, speed, time } = req.body;
+  if (!device_id) {
+    return res.status(400).json({ error: 'Missing required field: device_id' });
+  }
+  req.params = req.params || {};
+  req.params.busId = device_id;
+  handleLocationUpdate(req, res);
+});
+
+function handleLocationUpdate(req, res) {
   const { busId: busIdFromParams } = req.params;
   const { lat, lon, speed, time } = req.body;
-  
+
   if (lat === undefined || lon === undefined) {
     return res.status(400).json({ error: 'Missing required fields: lat, lon' });
   }
@@ -216,10 +228,10 @@ app.post('/api/locations/:busId', (req, res) => {
     route = routeVariants.morning || routeVariants.evening;
   }
   // --- End of Smart Route Determination ---
-  
+
   let currentStopIndex = 0;
   let status = speed > 0 ? 'Moving' : 'Stopped';
-  
+
   // Find current stop based on proximity
   let minDistance = Infinity;
   route.stops.forEach((stop, index) => {
@@ -229,7 +241,7 @@ app.post('/api/locations/:busId', (req, res) => {
       currentStopIndex = index;
     }
   });
-  
+
   // If very close to a stop (within 100m), mark as at stop
   if (minDistance < 0.1) {
     status = 'At Stop';
@@ -261,15 +273,15 @@ app.post('/api/locations/:busId', (req, res) => {
   };
 
   busLocations.set(busId, locationData);
-  
+
   console.log(`📍 Updated location for ${busId}: ${lat}, ${lon} (Speed: ${speed} km/h) on ${routeType} route at ${time}`);
-  
+
   res.json({
     success: true,
     message: 'Location updated successfully',
     data: locationData
   });
-});
+}
 
 // Get bus route information
 app.get('/api/routes/:busId', (req, res) => {
