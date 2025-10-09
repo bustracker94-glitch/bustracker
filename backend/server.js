@@ -61,16 +61,16 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// Initialize bus routes and locations
+// Initialize bus routes and locations using the full busId (e.g., 'BUS_001')
 busRoutesData.forEach(route => {
-  const baseBusId = route.busId.split('_')[0];
-  if (!busRoutes.has(baseBusId)) {
+  const fullBusId = route.busId;
+  if (!busRoutes.has(fullBusId)) {
     const routeVariants = {};
-    busRoutes.set(baseBusId, routeVariants);
+    busRoutes.set(fullBusId, routeVariants);
     const initialRoute = routeVariants.morning || routeVariants.evening || route;
 
-    busLocations.set(baseBusId, {
-      busId: baseBusId,
+    busLocations.set(fullBusId, {
+      busId: fullBusId,
       lat: initialRoute.stops[0].lat,
       lon: initialRoute.stops[0].lon,
       speed: 0,
@@ -82,7 +82,7 @@ busRoutesData.forEach(route => {
   }
 
   const routeType = route.busId.includes('_EVE') ? 'evening' : 'morning';
-  busRoutes.get(baseBusId)[routeType] = route;
+  busRoutes.get(fullBusId)[routeType] = route;
 });
 
 // Routes
