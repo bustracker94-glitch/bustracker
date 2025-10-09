@@ -18,17 +18,17 @@ app.get('/', (req, res) => {
   });
 });
 
-// List all bus locations
-app.get('/api/locations', (req, res) => {
-  const locations = Array.from(busLocations.values());
-  res.json(locations);
-});
-
 // Middleware
 app.use(helmet());
 app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
+
+// List all bus locations
+app.get('/api/locations', (req, res) => {
+  const locations = Array.from(busLocations.values());
+  res.json(locations);
+});
 
 // In-memory storage for bus locations
 const busLocations = new Map();
@@ -49,8 +49,9 @@ function getLocalIP() {
 }
 
 // Helper function to calculate distance between two coordinates
+const EARTH_RADIUS_KM = 6371;
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in kilometers
+  const R = EARTH_RADIUS_KM;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -64,16 +65,19 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 busRoutesData.forEach(route => {
   const baseBusId = route.busId.split('_')[0];
   if (!busRoutes.has(baseBusId)) {
-    busRoutes.set(baseBusId, {});
+    const routeVariants = {};
+    busRoutes.set(baseBusId, routeVariants);
+    const initialRoute = routeVariants.morning || routeVariants.evening || route;
+
     busLocations.set(baseBusId, {
       busId: baseBusId,
-      lat: route.stops[0].lat,
-      lon: route.stops[0].lon,
+      lat: initialRoute.stops[0].lat,
+      lon: initialRoute.stops[0].lon,
       speed: 0,
       updated: new Date().toISOString(),
-      status: 'Stopped',
+      status: 'Offline',
       currentStopIndex: 0,
-      routeType: 'morning' // Default to morning
+      routeType: route.busId.includes('_EVE') ? 'evening' : 'morning'
     });
   }
 
@@ -101,10 +105,12 @@ function getBusDetails(busId, routeType) {
     return null;
   }
 
-  // If routeType is not provided, determine it by time
+  // If routeType is not provided, use the one stored with the bus location.
+  // The stored routeType is the most reliable source of truth.
   if (!routeType) {
-    const hour = new Date().getHours();
-    routeType = hour < 12 ? 'morning' : 'evening';
+    routeType = location.routeType;
+  } else if (routeType !== location.routeType) {
+    location.routeType = routeType; // Allow override but update state
   }
 
   let route = routeVariants[routeType];
@@ -121,15 +127,16 @@ function getBusDetails(busId, routeType) {
   const currentStop = route.stops[location.currentStopIndex];
   const nextStop = route.stops[location.currentStopIndex + 1];
 
-  let eta = 'Unknown';
-  if (nextStop && location.speed > 0) {
+  let eta = 'N/A';
+  if (location.status === 'At Stop' || location.speed === 0) {
+    eta = 'Stopped';
+  } else if (nextStop && location.speed > 0) {
     const distance = calculateDistance(
       location.lat, location.lon,
       nextStop.lat, nextStop.lon
     );
-    eta = Math.ceil((distance / location.speed) * 60); // minutes
-  } else if (location.speed === 0) {
-    eta = 'Stopped';
+    // ETA in minutes, with a floor of 1 minute if moving.
+    eta = Math.max(1, Math.ceil((distance / location.speed) * 60));
   }
 
   return {
@@ -162,8 +169,7 @@ app.get('/api/buses', (req, res) => {
 // Get specific bus location
 app.get('/api/locations/:busId', (req, res) => {
   const { busId } = req.params;
-  const { routeType } = req.query; // morning or evening
-  const busDetails = getBusDetails(busId.toUpperCase(), routeType);
+  const busDetails = getBusDetails(busId.toUpperCase()); // routeType is now determined automatically
   
   if (!busDetails) {
     return res.status(404).json({ error: 'Bus not found' });
@@ -173,27 +179,43 @@ app.get('/api/locations/:busId', (req, res) => {
 });
 
 // Update bus location (from GPS hardware)
-app.post('/api/locations', (req, res) => {
-  const { device_id, lat, lon, speed, time } = req.body;
+app.post('/api/locations/:busId', (req, res) => {
+  const { busId: busIdFromParams } = req.params;
+  const { lat, lon, speed, time } = req.body;
   
-  if (!device_id || lat === undefined || lon === undefined) {
-    return res.status(400).json({ error: 'Missing required fields: device_id, lat, lon' });
+  if (lat === undefined || lon === undefined) {
+    return res.status(400).json({ error: 'Missing required fields: lat, lon' });
   }
 
-  const busId = device_id.toUpperCase();
+  const busId = busIdFromParams.toUpperCase();
   const routeVariants = busRoutes.get(busId);
   if (!routeVariants) {
     return res.status(404).json({ error: 'Bus not found' });
   }
 
-  // Determine route by time of day
-  const hour = new Date().getHours();
-  const routeType = hour < 12 ? 'morning' : 'evening';
-  const route = routeVariants[routeType];
+  // --- Smart Route Determination ---
+  // Determine the route based on proximity to the start/end points of the morning/evening routes.
+  const morningRoute = routeVariants.morning;
+  const eveningRoute = routeVariants.evening;
+
+  let routeType = 'morning'; // Default
+  if (morningRoute && eveningRoute) {
+    const distToMorningStart = calculateDistance(lat, lon, morningRoute.stops[0].lat, morningRoute.stops[0].lon);
+    const distToEveningStart = calculateDistance(lat, lon, eveningRoute.stops[0].lat, eveningRoute.stops[0].lon);
+    // If the bus is closer to the start of the evening route, it's on the evening trip. Otherwise, morning.
+    routeType = distToEveningStart < distToMorningStart ? 'evening' : 'morning';
+  } else if (eveningRoute) {
+    routeType = 'evening';
+  }
+
+  let route = routeVariants[routeType];
+  // --- End of Smart Route Determination ---
 
   if (!route) {
-    return res.status(404).json({ error: `Route type '${routeType}' not found for bus ${busId}` });
+    // Fallback if one of the routes is missing for some reason
+    route = routeVariants.morning || routeVariants.evening;
   }
+  // --- End of Smart Route Determination ---
   
   let currentStopIndex = 0;
   let status = speed > 0 ? 'Moving' : 'Stopped';
@@ -217,8 +239,12 @@ app.post('/api/locations', (req, res) => {
   let updatedTimestamp;
   if (time) {
     // The hardware sends time as "HH:MM:SS". We combine it with the current date.
-    const today = new Date().toISOString().split('T')[0];
-    updatedTimestamp = new Date(`${today}T${time}Z`).toISOString();
+    // Use IST for creating the date to avoid timezone mismatches around midnight.
+    const nowInIST = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const year = nowInIST.getFullYear();
+    const month = String(nowInIST.getMonth() + 1).padStart(2, '0');
+    const day = String(nowInIST.getDate()).padStart(2, '0');
+    updatedTimestamp = new Date(`${year}-${month}-${day}T${time}Z`).toISOString();
   } else {
     updatedTimestamp = new Date().toISOString();
   }

@@ -31,7 +31,6 @@ interface BusState {
   selectedBus: Bus | null;
   loading: boolean;
   error: string | null;
-  routeType: 'morning' | 'evening';
 }
 
 type BusAction =
@@ -39,29 +38,25 @@ type BusAction =
   | { type: 'SET_BUSES'; payload: Bus[] }
   | { type: 'SET_SELECTED_BUS'; payload: Bus | null }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'UPDATE_BUS_LOCATION'; payload: { busId: string; data: Partial<Bus> } }
-  | { type: 'SET_ROUTE_TYPE'; payload: 'morning' | 'evening' };
+  | { type: 'UPDATE_BUS_LOCATION'; payload: { busId: string; data: Partial<Bus> } };
 
 const initialState: BusState = {
   buses: [],
   selectedBus: null,
   loading: false,
   error: null,
-  routeType: new Date().getHours() < 12 ? 'morning' : 'evening',
 };
 
 const BusContext = createContext<{
   state: BusState;
   dispatch: React.Dispatch<BusAction>;
   fetchBuses: () => Promise<void>;
-  fetchBusDetails: (busId: string, routeType: 'morning' | 'evening') => Promise<void>;
-  setRouteType: (routeType: 'morning' | 'evening') => void;
+  fetchBusDetails: (busId: string) => Promise<void>;
 }>({
   state: initialState,
   dispatch: () => {},
   fetchBuses: async () => {},
   fetchBusDetails: async () => {},
-  setRouteType: () => {},
 });
 
 function busReducer(state: BusState, action: BusAction): BusState {
@@ -80,17 +75,16 @@ function busReducer(state: BusState, action: BusAction): BusState {
           ? { ...bus, ...action.payload.data }
           : bus
       );
-      const updatedSelectedBus = state.selectedBus?.busId === action.payload.busId
-        ? { ...state.selectedBus, ...action.payload.data }
-        : state.selectedBus;
+      const updatedSelectedBus =
+        state.selectedBus?.busId === action.payload.busId
+          ? { ...state.selectedBus, ...action.payload.data }
+          : state.selectedBus;
 
       return {
         ...state,
         buses: updatedBuses,
         selectedBus: updatedSelectedBus
       };
-    case 'SET_ROUTE_TYPE':
-      return { ...state, routeType: action.payload };
     default:
       return state;
   }
@@ -112,21 +106,17 @@ export function BusProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchBusDetails = async (busId: string, routeType: 'morning' | 'evening') => {
+  const fetchBusDetails = async (busId: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const bus = await busService.getBusLocation(busId, routeType);
+      const bus = await busService.getBusLocation(busId);
       dispatch({ type: 'SET_SELECTED_BUS', payload: bus });
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: 'Failed to fetch bus details' });
-      console.error('Error fetching bus details:', error);
+      console.error(`Error fetching details for bus ${busId}:`, error);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
-
-  const setRouteType = (routeType: 'morning' | 'evening') => {
-    dispatch({ type: 'SET_ROUTE_TYPE', payload: routeType });
   };
 
   // Auto-refresh buses every 5 seconds
@@ -140,14 +130,14 @@ export function BusProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.selectedBus) {
       const interval = setInterval(() => {
-        fetchBusDetails(state.selectedBus!.busId, state.routeType);
+        fetchBusDetails(state.selectedBus!.busId);
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [state.selectedBus?.busId, state.routeType]);
+  }, [state.selectedBus?.busId, fetchBusDetails]);
 
   return (
-    <BusContext.Provider value={{ state, dispatch, fetchBuses, fetchBusDetails, setRouteType }}>
+    <BusContext.Provider value={{ state, dispatch, fetchBuses, fetchBusDetails }}>
       {children}
     </BusContext.Provider>
   );
