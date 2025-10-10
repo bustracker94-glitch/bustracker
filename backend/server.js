@@ -18,6 +18,9 @@ app.get('/', (req, res) => {
   });
 });
 
+// Handle favicon requests from browsers
+app.get('/favicon.ico', (req, res) => res.status(204).send());
+
 // Middleware
 app.use(helmet());
 app.use(cors());
